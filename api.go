@@ -1,10 +1,14 @@
 package main
 
 import (
+	"os"
 	"fmt"
 	"log"
 	"flag"
+	"syscall"
 	"net/http"
+	//"io/ioutil"
+	"os/signal"
 	"encoding/json"
 
 	"github.com/gorilla/mux"
@@ -34,13 +38,30 @@ func getEntries(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(entries)
 }
 
+func cleanup() {
+	fmt.Println("Closing server")
+}
+
 func main() {
+	// Handle SIGTERM
+	sigterm := make(chan os.Signal)
+	signal.Notify(sigterm, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-sigterm
+		cleanup()
+		os.Exit(1)
+	}()
+
+	// Parse flags
 	portFlag := flag.Int("port", 3030, "Port to serve HTTP server")
 	flag.Parse()
 
-	httpPort := fmt.Sprintf(":%d", *portFlag)
+	// Setup routes for API
 	router := mux.NewRouter().StrictSlash(true)
 	router.HandleFunc("/api", welcome)
 	router.HandleFunc("/api/entries", getEntries).Methods("GET")
+
+	// Start HTTP server
+	httpPort := fmt.Sprintf(":%d", *portFlag)
 	log.Fatal(http.ListenAndServe(httpPort, router))
 }
