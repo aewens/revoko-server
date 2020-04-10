@@ -4,6 +4,7 @@
 *.swo
 NOTES
 nginx.conf
+*.so
 
 ### Go ###
 # Binaries for programs and plugins

@@ -30,6 +30,10 @@ var entries = Entries{
 	},
 };
 
+type Config struct {
+	Port int
+}
+
 func welcome(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, "Hello, world!")
 }
@@ -40,6 +44,32 @@ func getEntries(w http.ResponseWriter, r *http.Request) {
 
 func cleanup() {
 	fmt.Println("Closing server")
+}
+
+func ReadConfig(path string) (*Config, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	defer file.Close()
+	//buf, err := ioutil.ReadAll(file)
+	//if err != nil {
+	//	log.Fatal(err)
+	//}
+
+	raw := make(map[string]interface{})
+	json.NewDecoder(file).Decode(&raw)
+
+	port, valid := raw["port"].(float64)
+	if !valid {
+		fmt.Printf("%v | %T\n", raw, raw["port"])
+		port = float64(3030)
+	}
+
+	config := &Config{Port: int(port)}
+
+	return config, err
 }
 
 func main() {
@@ -53,8 +83,20 @@ func main() {
 	}()
 
 	// Parse flags
-	portFlag := flag.Int("port", 3030, "Port to serve HTTP server")
+	//portFlag := flag.Int("port", 3030, "Port to serve HTTP server")
+	configFlag := flag.String("config", "", "Path to config file")
 	flag.Parse()
+
+	if len(*configFlag) == 0 {
+		log.Fatal("ERROR: Config flag is missing!")
+		os.Exit(2)
+	}
+
+	config, err := ReadConfig(*configFlag)
+	if err != nil {
+		log.Fatal(err)
+		os.Exit(3)
+	}
 
 	// Setup routes for API
 	router := mux.NewRouter().StrictSlash(true)
@@ -62,6 +104,7 @@ func main() {
 	router.HandleFunc("/api/entries", getEntries).Methods("GET")
 
 	// Start HTTP server
-	httpPort := fmt.Sprintf(":%d", *portFlag)
+	httpPort := fmt.Sprintf(":%d", config.Port)
+	fmt.Printf("Starting server on port %d\n", config.Port)
 	log.Fatal(http.ListenAndServe(httpPort, router))
 }
