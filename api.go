@@ -22,11 +22,11 @@ type Entry struct {
 
 type Entries []Entry
 
-var entries = Entries{
+var testEntries = Entries{
 	{
 		ID:			1,	
 		ParentID:	0,
-		Value:		"Test",
+		Value:		"test",
 	},
 };
 
@@ -34,12 +34,12 @@ type Config struct {
 	Port int
 }
 
-func welcome(w http.ResponseWriter, r *http.Request) {
+func Welcome(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, "Hello, world!")
 }
 
-func getEntries(w http.ResponseWriter, r *http.Request) {
-	json.NewEncoder(w).Encode(entries)
+func GetEntries(w http.ResponseWriter, r *http.Request) {
+	json.NewEncoder(w).Encode(testEntries)
 }
 
 func cleanup() {
@@ -72,6 +72,8 @@ func ReadConfig(path string) (*Config, error) {
 	return config, err
 }
 
+
+
 func main() {
 	// Handle SIGTERM
 	sigterm := make(chan os.Signal)
@@ -100,8 +102,8 @@ func main() {
 
 	// Setup routes for API
 	router := mux.NewRouter().StrictSlash(true)
-	router.HandleFunc("/api", welcome)
-	router.HandleFunc("/api/entries", getEntries).Methods("GET")
+	router.HandleFunc("/api", Welcome)
+	router.HandleFunc("/api/entries", GetEntries).Methods("GET")
 
 	// Start HTTP server
 	httpPort := fmt.Sprintf(":%d", config.Port)
