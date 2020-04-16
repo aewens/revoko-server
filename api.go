@@ -30,10 +30,6 @@ var testEntries = Entries{
 	},
 };
 
-type Config struct {
-	Port int
-}
-
 func Welcome(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, "Hello, world!")
 }
@@ -44,6 +40,12 @@ func GetEntries(w http.ResponseWriter, r *http.Request) {
 
 func cleanup() {
 	fmt.Println("Closing server")
+}
+
+type Config struct {
+	Port int
+	User string
+	Password string
 }
 
 func ReadConfig(path string) (*Config, error) {
@@ -61,13 +63,43 @@ func ReadConfig(path string) (*Config, error) {
 	raw := make(map[string]interface{})
 	json.NewDecoder(file).Decode(&raw)
 
-	port, valid := raw["port"].(float64)
-	if !valid {
-		fmt.Printf("%v | %T\n", raw, raw["port"])
-		port = float64(3030)
+	rawPort, ok := raw["port"]; if !ok {
+		log.Fatalf("Missing 'port' from config file: %s", path)
 	}
 
-	config := &Config{Port: int(port)}
+	port, valid := rawPort.(float64); if !valid {
+		log.Fatalf("Value of 'port' is not a number: %v", port)
+	}
+
+	rawDatabase, ok := raw["database"]; if !ok {
+		log.Fatalf("Missing 'database' from config file: %s", path)
+	}
+
+	database, valid := rawDatabase.(map[string]interface{}); if !valid {
+		log.Fatalf("Value of 'port' is not a dictionary: %v", rawDatabase)
+	}
+
+	rawUser, ok := database["user"]; if !ok {
+		log.Fatalf("Missing 'user' from database in config file: %s", path)
+	}
+
+	user, valid := rawUser.(string); if !valid {
+		log.Fatalf("Value of 'user' is not a string: %v", rawUser)
+	}
+
+	rawPassword, ok := database["password"]; if !ok {
+		log.Fatalf("Missing 'password' from database in config file: %s", path)
+	}
+
+	password, valid := rawPassword.(string); if !valid {
+		log.Fatalf("Value of 'password' is not a string: %v", rawPassword)
+	}
+
+	config := &Config{
+		Port: int(port),
+		User: user,
+		Password: password,
+	}
 
 	return config, err
 }
