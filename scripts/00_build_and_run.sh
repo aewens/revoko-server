@@ -22,6 +22,3 @@ nohup $SRC/api.o -config $1 2>&1 >> $2 &>/dev/null &
 
 # Write PID to pid file
 echo $! > $3
-
-# Remove config file
-rm $1
