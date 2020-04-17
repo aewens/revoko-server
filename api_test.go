@@ -11,17 +11,20 @@ import (
 func TestReadConfig(t *testing.T) {
 	testFile := "/tmp/revoko_test_config.json"
 	testPort := 3030
-	testUser := "test"
-	testPassword := "test"
+	testDBUri := "http://0.0.0.0:5984"
+	testDBUser := "test"
+	testDBPassword := "test"
 	testJSON := `{
 		"port": %d,
 		"database": {
+			"uri": "%s",
 			"user": "%s",
 			"password": "%s"
 		}
 	}`
 
-	testData := []byte(fmt.Sprintf(testJSON, testPort, testUser, testPassword))
+	testData := []byte(fmt.Sprintf(testJSON, testPort, testDBUri, testDBUser,
+		testDBPassword))
 	err := ioutil.WriteFile(testFile, testData, 0644)
 	
 	if err != nil {
@@ -37,15 +40,22 @@ func TestReadConfig(t *testing.T) {
 		t.Errorf("Parsed port as '%v' instead of '%d'", configPort, testPort)
 	}
 
-	configUser := config.User
-	if configUser != testUser {
-		t.Errorf("Parsed user as '%v' instead of '%s'", configUser, testUser)
+	DBUri := config.DBUri
+	if DBUri != testDBUri {
+		t.Errorf("Parsed database uri as '%v' instead of '%s'", DBUri,
+			testDBUri)
 	}
 
-	configPassword := config.Password
-	if configPassword != testPassword {
-		t.Errorf("Parsed password as '%v' instead of '%s'", configPassword,
-			testPassword)
+	DBUser := config.DBUser
+	if DBUser != testDBUser {
+		t.Errorf("Parsed database user as '%v' instead of '%s'", DBUser,
+			testDBUser)
+	}
+
+	DBPassword := config.DBPassword
+	if DBPassword != testDBPassword {
+		t.Errorf("Parsed password as '%v' instead of '%s'", DBPassword,
+			testDBPassword)
 	}
 }
 

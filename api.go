@@ -7,7 +7,7 @@ import (
 	"flag"
 	"syscall"
 	"net/http"
-	//"io/ioutil"
+	"io/ioutil"
 	"os/signal"
 	"encoding/json"
 
@@ -44,8 +44,9 @@ func cleanup() {
 
 type Config struct {
 	Port int
-	User string
-	Password string
+	DBUri string
+	DBUser string
+	DBPassword string
 }
 
 func ReadConfig(path string) (*Config, error) {
@@ -79,6 +80,14 @@ func ReadConfig(path string) (*Config, error) {
 		log.Fatalf("Value of 'port' is not a dictionary: %v", rawDatabase)
 	}
 
+	rawUri, ok := database["uri"]; if !ok {
+		log.Fatalf("Missing 'uri' from database in config file: %s", path)
+	}
+
+	uri, valid := rawUri.(string); if !valid {
+		log.Fatalf("Value of 'uri' is not a string: %v", rawUri)
+	}
+
 	rawUser, ok := database["user"]; if !ok {
 		log.Fatalf("Missing 'user' from database in config file: %s", path)
 	}
@@ -97,17 +106,27 @@ func ReadConfig(path string) (*Config, error) {
 
 	config := &Config{
 		Port: int(port),
-		User: user,
-		Password: password,
+		DBUri: uri,
+		DBUser: user,
+		DBPassword: password,
 	}
 
 	return config, err
 }
 
+func StartServer(config *Config) {
+	// Setup routes for API
+	router := mux.NewRouter().StrictSlash(true)
+	router.HandleFunc("/api", Welcome)
+	router.HandleFunc("/api/entries", GetEntries).Methods("GET")
 
+	// Start HTTP server
+	httpPort := fmt.Sprintf(":%d", config.Port)
+	fmt.Printf("Starting server on port %d\n", config.Port)
+	log.Fatal(http.ListenAndServe(httpPort, router))
+}
 
-func main() {
-	// Handle SIGTERM
+func HandleSigterm() {
 	sigterm := make(chan os.Signal)
 	signal.Notify(sigterm, os.Interrupt, syscall.SIGTERM)
 	go func() {
@@ -115,6 +134,35 @@ func main() {
 		cleanup()
 		os.Exit(1)
 	}()
+}
+
+func DatabaseGet(config *Config, path string) string {
+	client := &http.Client{}
+	dbPath := fmt.Sprintf("%s/%s", config.DBUri, path)
+	req, err := http.NewRequest("GET", dbPath, nil); if err != nil {
+		log.Fatal(err)
+	}
+
+	req.SetBasicAuth(config.DBUser, config.DBPassword)
+	resp, err := client.Do(req); if err != nil {
+		log.Fatal(err)
+	}
+
+	if status := resp.StatusCode; status != http.StatusOK {
+		log.Fatalf("%s got status code '%v' instead of '%v'", dbPath, status,
+			http.StatusOK)
+	}
+
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body); if err != nil {
+		log.Fatal(err)
+	}
+
+	return string(body)
+}
+
+func main() {
+	HandleSigterm()
 
 	// Parse flags
 	//portFlag := flag.Int("port", 3030, "Port to serve HTTP server")
@@ -132,13 +180,6 @@ func main() {
 		os.Exit(3)
 	}
 
-	// Setup routes for API
-	router := mux.NewRouter().StrictSlash(true)
-	router.HandleFunc("/api", Welcome)
-	router.HandleFunc("/api/entries", GetEntries).Methods("GET")
-
-	// Start HTTP server
-	httpPort := fmt.Sprintf(":%d", config.Port)
-	fmt.Printf("Starting server on port %d\n", config.Port)
-	log.Fatal(http.ListenAndServe(httpPort, router))
+	fmt.Println(DatabaseGet(config, ""))
+	StartServer(config)
 }
