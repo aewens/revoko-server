@@ -2,9 +2,10 @@
 *.vim
 *.swp
 *.swo
+*.o
+test_*
 NOTES
 nginx.conf
-*.o
 
 ### Go ###
 # Binaries for programs and plugins

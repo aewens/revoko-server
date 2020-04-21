@@ -1,12 +1,23 @@
 package main
 
 import (
+	"os"
 	"fmt"
 	"testing"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 )
+
+var configPath string
+
+func TestLoadEnv(t *testing.T) {
+	configPathEnv, ok := os.LookupEnv("CONFIG_PATH"); if !ok {
+		t.Fatal("Missing 'CONFIG_PATH' environment variable")
+	}
+
+	configPath = configPathEnv
+}
 
 func TestReadConfig(t *testing.T) {
 	testFile := "/tmp/revoko_test_config.json"
@@ -79,5 +90,33 @@ func TestGetEntries(t *testing.T) {
 	if rrEntries != testEntries {
 		t.Errorf("/api/entries returned '%v' instead of '%v'", rrEntries,
 			testEntries)
+	}
+}
+
+func TestDatabaseGet(t *testing.T) {
+	config, err := ReadConfig(configPath); if err != nil {
+		t.Fatal(err)
+	}
+
+	resp, err := DatabaseGet(config, "/"); if err != nil {
+		t.Error(err)
+	}
+
+	if len(resp) == 0 {
+		t.Fatal("Got no response from database")
+	}
+}
+
+func TestAllDatabases(t *testing.T) {
+	config, err := ReadConfig(configPath); if err != nil {
+		t.Fatal(err)
+	}
+
+	resp, err := AllDatabases(config); if err != nil {
+		t.Error(err)
+	}
+
+	if len(resp) == 0 {
+		t.Error("No databases listed")
 	}
 }

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"flag"
+	"errors"
 	"syscall"
 	"net/http"
 	"io/ioutil"
@@ -136,36 +137,47 @@ func HandleSigterm() {
 	}()
 }
 
-func DatabaseGet(config *Config, path string) string {
+func DatabaseGet(config *Config, path string) (string, error) {
 	client := &http.Client{}
-	dbPath := fmt.Sprintf("%s/%s", config.DBUri, path)
+	dbPath := fmt.Sprintf("%s%s", config.DBUri, path)
 	req, err := http.NewRequest("GET", dbPath, nil); if err != nil {
 		log.Fatal(err)
+		return "", err
 	}
 
 	req.SetBasicAuth(config.DBUser, config.DBPassword)
 	resp, err := client.Do(req); if err != nil {
 		log.Fatal(err)
+		return "", err
 	}
 
 	if status := resp.StatusCode; status != http.StatusOK {
-		log.Fatalf("%s got status code '%v' instead of '%v'", dbPath, status,
-			http.StatusOK)
+		errMessage := "%s got status code '%v' instead of '%v'"
+		err := errors.New(fmt.Sprintf(errMessage, dbPath, status,http.StatusOK))
+		log.Fatal(err)
+		return "", err
 	}
 
 	defer resp.Body.Close()
 	body, err := ioutil.ReadAll(resp.Body); if err != nil {
 		log.Fatal(err)
+		return "", err
 	}
 
-	return string(body)
+	return string(body), nil
 }
 
-func main() {
-	HandleSigterm()
+func AllDatabases(config *Config) ([]string, error) {
+	var dbs []string
 
-	// Parse flags
-	//portFlag := flag.Int("port", 3030, "Port to serve HTTP server")
+	resp, err := DatabaseGet(config, "/_all_dbs"); if err == nil {
+		json.Unmarshal([]byte(resp), &dbs)
+	}
+
+	return dbs, err
+}
+
+func ParseFlags() map[string]interface{} {
 	configFlag := flag.String("config", "", "Path to config file")
 	flag.Parse()
 
@@ -174,12 +186,40 @@ func main() {
 		os.Exit(2)
 	}
 
-	config, err := ReadConfig(*configFlag)
-	if err != nil {
+	flags := make(map[string]interface{})
+	flags["config"] = *configFlag
+
+	return flags
+}
+
+func main() {
+	HandleSigterm()
+
+	flags := ParseFlags()
+	configFlag, ok := flags["config"]; if !ok {
+		log.Fatal("ERROR: Config flag is missing!")
+		os.Exit(2)
+	}
+
+	configPath, ok := configFlag.(string); if !ok {
+		log.Fatalf("Config flag is not a string: %v", configFlag)
+	}
+
+	config, err := ReadConfig(configPath); if err != nil {
 		log.Fatal(err)
 		os.Exit(3)
 	}
 
-	fmt.Println(DatabaseGet(config, ""))
+	dbs, err := AllDatabases(config); if err != nil {
+		log.Fatal(err)
+		os.Exit(4)
+	}
+
+	fmt.Println("Databases:")
+	for _, db := range dbs {
+		fmt.Printf("- %s\n", db)
+	}
+	fmt.Printf("\n")
+
 	StartServer(config)
 }
